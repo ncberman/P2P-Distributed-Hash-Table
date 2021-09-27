@@ -1,3 +1,5 @@
+package Server;
+
 public class UserData
 {
     public String username;

@@ -1,22 +1,42 @@
+package Server;
 import java.util.List;
+
 import java.net.*;
 import java.io.*;
 
-public class DHTServer 
+public class DHTServer extends Thread
 {
     private ServerSocket serverSocket;
     private int serverPort = 38500; // Socket Group 75 is allowed to use ports 38500 - 38999
 
     private List<UserData> UserList;
+    private boolean runServer = false;
+
+    public boolean GetServerState()
+    {
+        return runServer;
+    }
+
+    public void StopServer()
+    {
+        runServer = false;
+    }
 
     // Constantly blocks and listens to our socket on our port for incoming messages, when a message is received we create a new listener class to read the message.
-    public void StartServer() throws IOException
+    public void StartServer()
     {
-        serverSocket = new ServerSocket(serverPort);
-        while(true)
+        try 
         {
-            new ClientListener(serverSocket.accept()).Listen();
-        }
+            serverSocket = new ServerSocket(serverPort);
+            runServer = true;
+
+            while(runServer)
+            {
+                new ClientListener(serverSocket.accept()).start();
+            }
+
+        } catch (IOException e) { e.printStackTrace(); }
+        
     }
 
         private class ClientListener extends Thread
@@ -166,6 +186,53 @@ public class DHTServer
     public String QueryDHT(String queriedUser)
     {
         return "FAILURE";
+    }
+
+    public static void main(String[] args)
+    {
+        DHTServer server = new DHTServer();
+        System.out.println("'Start' - To start the DHT server.\n'Stop' - To stop the DHT server.\n'Exit' - To close the program\n");
+
+        try
+        {
+            BufferedReader commandLine = new BufferedReader(new InputStreamReader(System.in));
+            String command = commandLine.readLine();
+            while(!command.equalsIgnoreCase("exit"))
+            {
+                if(command.equalsIgnoreCase("start"))
+                {
+                    if(!server.GetServerState())
+                    {
+                        server.StartServer();
+                        System.out.println("Server successfully started!");
+                    }
+                    else{ System.out.println("Server is already running."); }
+                }
+                else if(command.equalsIgnoreCase("stop"))
+                {
+                    if(server.GetServerState())
+                    {
+                        server.StopServer();
+                        System.out.println("Server successfully stopped!");
+                    }
+                    else{ System.out.println("Server is not currently running."); }
+                }
+                else
+                {
+                    System.out.println("Unrecognized command...\n'Start' - To start the DHT server.\n'Stop' - To stop the DHT server.\n'Exit' - To close the program\n");
+                }
+
+                command = commandLine.readLine();
+            }
+
+            System.out.println("Exiting Program");
+            try 
+            {
+                Thread.sleep(1000);
+            } 
+            catch (InterruptedException e) { e.printStackTrace(); }
+        }
+        catch(IOException e){ System.out.println(e); }
     }
 }
 
