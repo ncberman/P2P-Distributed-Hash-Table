@@ -52,9 +52,9 @@ public class DHTServer
 
             private String ClientMessageParser(String msg)
             {
-                // The format of our client's messages is in command:input:input:... where ':' is our tokenizer / delimiter 
-                // This also means that ':' must be a disallowed character for inputs as to not disrupt our server's parser
-                String[] tokenizedMsg = msg.split(":");
+                // The format of our client's messages is in command:input:input:... where '#' is our tokenizer / delimiter 
+                // This also means that '#' must be a disallowed character for inputs as to not disrupt our server's parser
+                String[] tokenizedMsg = msg.split("#");
 
                 // This state represents parsing a message with the case of registering a new User
                 if(tokenizedMsg[0].equals("RegisterUser"))
@@ -87,14 +87,18 @@ public class DHTServer
                 }
                 if(tokenizedMsg[0].equals("SetupDHT"))
                 {
+                    int userbaseSize = Integer.parseInt(tokenizedMsg[1]);
+                    String leaderName = tokenizedMsg[2];
 
+                    return SetupDHT(userbaseSize, leaderName);                    
                 }
                 if(tokenizedMsg[0].equals("QueryDHT"))
                 {
-
+                    String queriedUser = tokenizedMsg[1];
+                    return QueryDHT(queriedUser);
                 }
 
-                return "default message";
+                return "UNRECOGNIZED MESSAGE";
             }
         }
 
@@ -136,6 +140,31 @@ public class DHTServer
             UserList.remove(existingUser);
             return "SUCCESS";
         }
+        return "FAILURE";
+    }
+
+    // Sets up a distributed hash table with specified size and leader
+    public String SetupDHT(int size, String leader)
+    {
+        boolean doesUserExist = false;
+        UserData leaderData;
+        for(UserData registeredUser : UserList)
+        {
+            if(registeredUser.username.equals(leader) && registeredUser.GetState().equals("FREE"))
+            {
+                doesUserExist = true;
+                leaderData = registeredUser;
+                break;
+            }
+        }
+        if(!doesUserExist){ return "FAILURE"; }
+        if(size < 2){ return "FAILURE"; }
+
+        return "SUCCESS";
+    }
+
+    public String QueryDHT(String queriedUser)
+    {
         return "FAILURE";
     }
 }
