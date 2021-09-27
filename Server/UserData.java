@@ -1,5 +1,6 @@
 package Server;
 
+// Class used to create objects representing our Users to help with data organization
 public class UserData
 {
     public String username;
@@ -7,8 +8,10 @@ public class UserData
     private int port;
     private String state;
 
+    // Constructor to store our given variables
     public UserData(String usr, byte[] ip, int prt)
     {
+        // Use a size 4 byte array to store our ipv4 address
         ipAddr = new byte[4];
         ipAddr[0] = ip[0];
         ipAddr[1] = ip[1];
