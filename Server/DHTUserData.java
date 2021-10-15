@@ -1,23 +1,17 @@
 package Server;
 
 // Class used to create objects representing our Users to help with data organization
-public class UserData
+public class DHTUserData
 {
     public String username;
-    private byte[] ipAddr;
+    private String ipAddr;
     private int port;
     private String state;
 
     // Constructor to store our given variables
-    public UserData(String usr, byte[] ip, int prt)
+    public DHTUserData(String usr, String ip, int prt)
     {
-        // Use a size 4 byte array to store our ipv4 address
-        ipAddr = new byte[4];
-        ipAddr[0] = ip[0];
-        ipAddr[1] = ip[1];
-        ipAddr[2] = ip[2];
-        ipAddr[3] = ip[3];
-
+        ipAddr = ip;
         username = usr;
         port = prt;
         state = "FREE";
@@ -43,15 +37,12 @@ public class UserData
         return port;
     }
 
-    public void SetIP(byte[] newIP)
+    public void SetIP(String newIP)
     {
-        ipAddr[0] = newIP[0];
-        ipAddr[1] = newIP[1];
-        ipAddr[2] = newIP[2];
-        ipAddr[3] = newIP[3];
+        ipAddr = newIP;
     }
 
-    public byte[] GetIP()
+    public String GetIP()
     {
         return ipAddr;
     }

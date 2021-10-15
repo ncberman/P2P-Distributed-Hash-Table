@@ -26,6 +26,16 @@ public class DHTServerThread extends Thread
         {
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             BufferedReader in  = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+            String inputString;
+            while(!(inputString = in.readLine()).equals("Close"))
+            {
+                out.write(server.Command(inputString));
+            }
+
+            socket.close();
+            out.close();
+            in.close();
         } 
         catch (IOException e)
         {

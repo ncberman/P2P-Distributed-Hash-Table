@@ -146,7 +146,7 @@ public class DHTClient
                 /*
                     Our last command will be the 'teardown-complete' command, takes 1 input variable being
                         1. Username of the leader of the old DHT
-                    This command will construct a #-Separated with the header using the default teardown-dht header 'TeardownDHT'
+                    This command will construct a #-Separated with the header using the default teardown-complete header 'TeardownCompleteDHT'
 
                     The purpose of this command is to tell the leader of the recently deleted DHT to finalize DHT deletion. This means
                     that the server should set all the users that were a part of the DHT to be set to the free state.
