@@ -28,7 +28,7 @@ public class DHTServerThread extends Thread
             BufferedReader in  = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
             String inputString;
-            while(!(inputString = in.readLine()).equals("Close"))
+            while((inputString = in.readLine()) != null)
             {
                 out.write(server.Command(inputString));
             }

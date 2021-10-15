@@ -43,8 +43,7 @@ public class DHTServer
             
             case "DeregisterUser":
                 if(completeDHT){ return "FAILURE"; }
-                DHTUserData existingUser = new DHTUserData(tokenizedCommand[1], tokenizedCommand[2], Integer.parseInt(tokenizedCommand[3]));
-                return DeregisterUser(existingUser);
+                return DeregisterUser(tokenizedCommand[1]);
                 
             case "TeardownDHT":
                 if(completeDHT){ return "FAILURE"; }
@@ -60,13 +59,28 @@ public class DHTServer
         return "FAILURE";
     }
 
-    // Registers a new user to our list of users so that other users can find them using the server
+    /*
+        RegisterUser function
+            This function takes in a data structure 'DHTUserData' and attempts to register the given data with the user-state-table.
+            To properly complete execution a few things must be true,
+                1. Username is a unique username
+                2. IP + Port combination must be unique
+    */
     public String RegisterUser(DHTUserData newUser)
     {
         boolean doesUserExist = false;
+
+        // Check to see if the username or ip:port already exists
         for(DHTUserData registeredUser : UserList)
         {
-            if(registeredUser.username.equalsIgnoreCase(newUser.username))
+            // See if username already exists
+            if(registeredUser.username.equalsIgnoreCase(newUser.username)) 
+            {
+                doesUserExist = true;
+                break;
+            }
+            // see if ip/port combination already exists
+            if(registeredUser.GetIP().equals(newUser.GetIP()) && registeredUser.GetPort() == newUser.GetPort())
             {
                 doesUserExist = true;
                 break;
@@ -80,23 +94,21 @@ public class DHTServer
         return "FAILURE";
     }
 
-    // Removes the user from the list of registered users so that they may no longer be used in DHT creation
-    public String DeregisterUser(DHTUserData existingUser)
+    /*
+        DeregisterUser function
+            This function removes the first user (which should also be the only user) with a name matching the name received.
+    */
+    public String DeregisterUser(String existingUser)
     {
-        boolean doesUserExist = false;
+        // Check to see if a user with the corresponding username exists
         for(DHTUserData registeredUser : UserList)
         {
-            if(registeredUser.username.equals(existingUser.username) && registeredUser.GetState().equals("FREE"))
+            // Remove the user if the username matches and existing user and that user is also in the FREE state
+            if(registeredUser.username.equals(existingUser) && registeredUser.GetState().equals("FREE"))
             {
-                doesUserExist = true;
-                existingUser = registeredUser;
-                break;
+                UserList.remove(registeredUser);
+                return "SUCCESS";
             }
-        }
-        if(doesUserExist)
-        {
-            UserList.remove(existingUser);
-            return "SUCCESS";
         }
         return "FAILURE";
     }
