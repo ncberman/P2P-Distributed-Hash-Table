@@ -1,5 +1,6 @@
 package Client;
 import java.io.*;
+import java.net.*;
 import java.util.Hashtable;
 
 public class DHTClient
@@ -7,7 +8,8 @@ public class DHTClient
     private Hashtable<String, String> localTable;
     public boolean isDHT = false;
 
-    private int serverIP = 0;
+    private static String serverIP = "";
+    private static int serverPort = 38500;
 
     public static void main(String[] args)
     {
@@ -20,6 +22,7 @@ public class DHTClient
             while(!command.equalsIgnoreCase("exit"))
             {
                 String[] tokenizedCommand = command.split(" ");
+                String msg = "";
                 /*
                     Our first command will be the 'register' command, this command requires 3 inputs variables being
                         1. Username
@@ -36,7 +39,7 @@ public class DHTClient
                     String ipv4 = tokenizedCommand[2];
                     String port = tokenizedCommand[3];
 
-                    String registerMsg = "RegisterUser#" + username + "#" + ipv4 + "#" + port;
+                    msg = "RegisterUser#" + username + "#" + ipv4 + "#" + port;
                 }
                 /*
                     Our second command will be the 'setup-dht' command, takes 2 inputs variables being
@@ -49,7 +52,17 @@ public class DHTClient
                 */
                 else if(tokenizedCommand[0].equalsIgnoreCase("setup-dht"))
                 {
+                    String size = tokenizedCommand[1];
+                    String username = tokenizedCommand[2];
 
+                    if(Integer.parseInt(size) >= 2)
+                    {
+                        msg = "SetupDHT#" + size + "#" + username;
+                    }
+                    else
+                    {
+                        System.out.println("DHT table size must be 2+");
+                    }
                 }
                 /*
                     Our third command will be the 'dht-complete' command, takes 1 input variable being
@@ -63,7 +76,10 @@ public class DHTClient
                 */
                 else if(tokenizedCommand[0].equalsIgnoreCase("dht-complete"))
                 {
+                    String username = tokenizedCommand[1];
 
+                    msg = "CompleteDHT#" + username;
+                    
                 }
                 /*
                     Our fourth command will be the 'query-dht' command, takes 1 input variable being
@@ -77,22 +93,64 @@ public class DHTClient
                 {
 
                 }
+                /*
+                    Our fifth command will be the 'leave-dht' command, takes 1 input variable being
+                        1. Username to be removed
+                    This command will construct a #-Separated with the header using the default leave-dht header 'LeaveDHT'
+
+                    The purpose of this command is to begin the process of removing a specified user from the DHT. After the DHT has been
+                    modified by the successful execution of this command the server will only accept the command 'dht-rebuilt'.
+                */
                 else if(tokenizedCommand[0].equalsIgnoreCase("leave-dht"))
                 {
 
                 }
+                /*
+                    Our sixth command will be the 'dht-rebuilt' command, takes 2 input variables being
+                        1. Username that was removed
+                        2. Username of new DHT leader
+                    This command will construct a #-Separated with the header using the default dht-rebuilt header 'RebuildDHT'
+
+                    The purpose of this command is to be used in conjunction with 'leave-dht' command, this command is the only command that
+                    can be accepted by the server after the leave-dht has executed succesfully. Rebuilds the DHT after the given username 
+                    has been removed and set to free.
+                */
                 else if(tokenizedCommand[0].equalsIgnoreCase("dht-rebuilt"))
                 {
 
                 }
+                /*
+                    Our seventh command will be the 'deregister' command, takes 1 input variable being
+                        1. Username that wants to be deregistered
+                    This command will construct a #-Separated with the header using the default deregister header 'DeregisterUser'
+
+                    The purpose of this command is to tell the watch-server that we would no longer like to register the specified user
+                    with the DHT service.
+                */
                 else if(tokenizedCommand[0].equalsIgnoreCase("deregister"))
                 {
 
                 }
+                /*
+                    Our eighth command will be the 'teardown-dht' command, takes 1 input variable being
+                        1. Username of the leader of the DHT
+                    This command will construct a #-Separated with the header using the default teardown-dht header 'TeardownDHT'
+
+                    The purpose of this command is to tell the leader of the current DHT to begin DHT deletion. The username inputted by
+                    this command must be the username of the current DHT leader.
+                */
                 else if(tokenizedCommand[0].equalsIgnoreCase("teardown-dht"))
                 {
 
                 }
+                /*
+                    Our last command will be the 'teardown-complete' command, takes 1 input variable being
+                        1. Username of the leader of the old DHT
+                    This command will construct a #-Separated with the header using the default teardown-dht header 'TeardownDHT'
+
+                    The purpose of this command is to tell the leader of the recently deleted DHT to finalize DHT deletion. This means
+                    that the server should set all the users that were a part of the DHT to be set to the free state.
+                */
                 else if(tokenizedCommand[0].equalsIgnoreCase("teardown-complete"))
                 {
 
@@ -102,6 +160,11 @@ public class DHTClient
                     System.out.println("Unrecognized command...");
                 }
 
+                if(!msg.equals(""))
+                {
+                    SendMessage(msg, serverIP, serverPort);
+                }
+                
                 command = commandLine.readLine();
             }
 
@@ -113,5 +176,33 @@ public class DHTClient
             catch (InterruptedException e) { e.printStackTrace(); }
         }
         catch(IOException e){ System.out.println(e); }
+    }
+
+    // Our Method to send messages from
+    public static void SendMessage(String msg, String ipaddr, int port)
+    {
+        InetAddress address;
+        try
+        {
+            address = InetAddress.getByName(ipaddr);
+
+            try
+            {
+                Socket socket = new Socket(address, port);
+                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+                out.write(msg);
+                out.close();
+                socket.close();
+            } 
+            catch (IOException e) 
+            {
+                e.printStackTrace();
+            }
+        }
+        catch (UnknownHostException e) 
+        {
+            e.printStackTrace();
+        }
+        
     }
 }
