@@ -9,7 +9,8 @@ public class DHTServer
     private int serverPort = 38500; // Socket Group 75 is allowed to use ports 38500 - 38999
 
     private List<DHTUserData> UserList;
-    private boolean completeDHT = false;
+    private boolean inProcessDHT = false;
+    private boolean DHTExists = false;
 
     public synchronized String Command(String command)
     {
@@ -18,39 +19,39 @@ public class DHTServer
         switch(tokenizedCommand[0])
         {
             case "RegisterUser":
-                if(completeDHT){ return "FAILURE"; }
+                if(inProcessDHT){ return "FAILURE"; }
                 DHTUserData newUser = new DHTUserData(tokenizedCommand[1], tokenizedCommand[2], Integer.parseInt(tokenizedCommand[3]));
                 return RegisterUser(newUser);
 
             case "SetupDHT":
-                if(completeDHT){ return "FAILURE"; }
+                if(inProcessDHT){ return "FAILURE"; }
                 return SetupDHT(Integer.parseInt(tokenizedCommand[1]), tokenizedCommand[2]);
 
-            case "CompleteDHT":
+            case "inProcessDHT":
                 break;
                 
             case "QueryDHT":
-                if(completeDHT){ return "FAILURE"; }
+                if(inProcessDHT){ return "FAILURE"; }
                 return QueryDHT(tokenizedCommand[1]);
             
             case "LeaveDHT":
-                if(completeDHT){ return "FAILURE"; }
+                if(inProcessDHT){ return "FAILURE"; }
                 break;
                 
             case "RebuildDHT":
-                if(completeDHT){ return "FAILURE"; }
+                if(inProcessDHT){ return "FAILURE"; }
                 break;
             
             case "DeregisterUser":
-                if(completeDHT){ return "FAILURE"; }
+                if(inProcessDHT){ return "FAILURE"; }
                 return DeregisterUser(tokenizedCommand[1]);
                 
             case "TeardownDHT":
-                if(completeDHT){ return "FAILURE"; }
+                if(inProcessDHT){ return "FAILURE"; }
                 break;
             
-            case "TeardownCompleteDHT":
-                if(completeDHT){ return "FAILURE"; }
+            case "TeardowninProcessDHT":
+                if(inProcessDHT){ return "FAILURE"; }
                 break;
                 
             default:
@@ -113,26 +114,70 @@ public class DHTServer
         return "FAILURE";
     }
 
-    // Sets up a distributed hash table with specified size and leader
+    /*
+        SetupDHT function
+            This function starts the process to create a distributed hashtable based on the given parameters given that the parameters 
+            meet our requirements.
+                These requirements must be met
+                1. Size of the DHT is less than or equal to the amount of registered users
+                2. A DHT does not already exist
+                3. The requested leader of the table exists
+                4. size is greater than or equal to 2
+            If all requirements are met the server will send a message to the leader containing instructions on who should be in the DHT
+            and the size.
+    */
     public String SetupDHT(int size, String leader)
     {
-        boolean doesUserExist = false;
-        DHTUserData leaderData;
-        for(DHTUserData registeredUser : UserList)
+        // First lets check the simplest requirements, size requirements
+        if(size < 2){ return "FAILURE"; }
+        if(size > UserList.size()){ return "FAILURE"; }
+
+        // Check if the DHT already exists
+        if(DHTExists){ return "FAILURE"; }
+
+        // Lastly lets check to see if the leader exists
+        for(DHTUserData registereduser : UserList)
         {
-            if(registeredUser.username.equals(leader) && registeredUser.GetState().equals("FREE"))
+            if(registereduser.username.equals(leader))
             {
-                doesUserExist = true;
-                leaderData = registeredUser;
-                break;
+                // Begin DHT setup here
+                inProcessDHT = true;
+                return "SUCCESS";
             }
         }
-        if(!doesUserExist){ return "FAILURE"; }
-        if(size < 2 || UserList.size() < size){ return "FAILURE"; }
 
-        return "SUCCESS";
+        return "FAILURE";
     }
 
+    /*
+        CompleteDHT function
+            This function allows the client to send a message to finish DHT setup, this function can only execute if the DHT is currently 
+            'inProcessDHT' of being setup AND the given username is the leader of the DHT.
+    */
+    public String CompleteDHT(String leader)
+    {
+        // First let's check to see that our server is currently in the process of setting up a DHT
+        if(!inProcessDHT){ return "FAILURE"; }
+
+        // Now let's check to see if our given username is the leader of the current DHT.
+        for(DHTUserData registeredUser : UserList)
+        {
+            if(registeredUser.username.equals(leader) && registeredUser.GetState().equals("LEADER"))
+            {
+                // Completes our setup process
+                inProcessDHT = false;
+                return "SUCCESS";
+            }
+        }
+
+        return "FAILURE";
+    }
+
+    /*
+        QueryDHT function
+            This function is used to query a random user that is mantaining the DHT. The taken username must not be a member of the DHT and a 
+            DHT must exist for this function to execute properly.
+    */
     public String QueryDHT(String queriedUser)
     {
         return "FAILURE";

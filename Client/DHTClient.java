@@ -8,12 +8,23 @@ public class DHTClient
     private Hashtable<String, String> localTable;
     public boolean isDHT = false;
 
-    private static String serverIP = "";
+    private static String serverIP = "127.0.0.1";
     private static int serverPort = 38500;
+    private static DHTClientData clientData;
+    private static DHTClientListener listener;
 
-    public static void main(String[] args)
+    public static void main(int argc, String[] args) throws UnknownHostException, IOException
     {
-        System.out.println("'Start' - To start the DHT server.\n'Stop' - To stop the DHT server.\n'Exit' - To close the program\n");
+        if(argc < 2|| Integer.parseInt(args[1]) > 38999 || Integer.parseInt(args[1]) < 38501){ System.out.println("Port must be between 38500 and 39000"); return; }
+        clientData  = new DHTClientData();
+        listener = new DHTClientListener(clientData, Integer.parseInt(args[1]));
+        listener.start();
+        
+        // Connect our client to our server
+        Socket serverSocket = new Socket(InetAddress.getByName(serverIP), serverPort);
+        PrintWriter out = new PrintWriter(serverSocket.getOutputStream(), true);
+        BufferedReader in = new BufferedReader( new InputStreamReader(serverSocket.getInputStream()));
+        
 
         try
         {
@@ -40,6 +51,7 @@ public class DHTClient
                     String port = tokenizedCommand[3];
 
                     msg = "RegisterUser#" + username + "#" + ipv4 + "#" + port;
+                    out.write(msg);
                 }
                 /*
                     Our second command will be the 'setup-dht' command, takes 2 inputs variables being
@@ -55,14 +67,8 @@ public class DHTClient
                     String size = tokenizedCommand[1];
                     String username = tokenizedCommand[2];
 
-                    if(Integer.parseInt(size) >= 2)
-                    {
-                        msg = "SetupDHT#" + size + "#" + username;
-                    }
-                    else
-                    {
-                        System.out.println("DHT table size must be 2+");
-                    }
+                    msg = "SetupDHT#" + size + "#" + username;
+                    out.write(msg);
                 }
                 /*
                     Our third command will be the 'dht-complete' command, takes 1 input variable being
@@ -79,7 +85,7 @@ public class DHTClient
                     String username = tokenizedCommand[1];
 
                     msg = "CompleteDHT#" + username;
-                    
+                    out.write(msg);
                 }
                 /*
                     Our fourth command will be the 'query-dht' command, takes 1 input variable being
@@ -164,7 +170,14 @@ public class DHTClient
                 {
                     SendMessage(msg, serverIP, serverPort);
                 }
-                
+
+                // We handle the server response here.
+                String serverResponse = in.readLine();
+                String[] tokenizedServerResponse = serverResponse.split("#");
+                for(String token : tokenizedServerResponse)
+                {
+                    System.out.println(token);
+                }
                 command = commandLine.readLine();
             }
 

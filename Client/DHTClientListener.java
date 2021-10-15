@@ -1,17 +1,17 @@
-package Server;
+package Client;
 
 import java.io.IOException;
 import java.net.ServerSocket;
 
-public class DHTServerListener extends Thread
+public class DHTClientListener extends Thread
 {
     public boolean listening = false;
-    private DHTServer server;
+    private DHTClientData clientData;
     private int port;
 
-    public DHTServerListener(DHTServer server, int port)
+    public DHTClientListener(DHTClientData clientData, int port)
     {
-        this.server = server;
+        this.clientData = clientData;
         this.port = port;
     }
 
@@ -23,10 +23,9 @@ public class DHTServerListener extends Thread
             ServerSocket mySocket = new ServerSocket(port);
             while(listening)
             {
-                System.out.println("Waiting for connections . . .");
-                new DHTServerThread(mySocket.accept(), server).start();
+                new DHTClientThread(mySocket.accept(), clientData).start();
             }
-            //mySocket.close();
+            mySocket.close();
         }
         catch(IOException e)
         {

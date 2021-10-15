@@ -6,6 +6,7 @@ public class DHTServerClient
     public static void main(String[] args)
     {
         DHTServer server = new DHTServer();
+        DHTServerListener listener = new DHTServerListener(server, 38500);
         System.out.println("'Start' - To start the DHT server.\n'Stop' - To stop the DHT server.\n'Exit' - To close the program\n");
 
         try
@@ -16,17 +17,18 @@ public class DHTServerClient
             {
                 if(command.equalsIgnoreCase("start"))
                 {
-                    if(!server.GetServerState())
+                    if(!listener.isAlive())
                     {
+                        listener.start();
                         System.out.println("Server successfully started!");
                     }
                     else{ System.out.println("Server is already running."); }
                 }
                 else if(command.equalsIgnoreCase("stop"))
                 {
-                    if(server.GetServerState())
+                    if(listener.isAlive())
                     {
-                        server.StopServer();
+                        listener.StopListener();
                         System.out.println("Server successfully stopped!");
                     }
                     else{ System.out.println("Server is not currently running."); }
@@ -39,6 +41,7 @@ public class DHTServerClient
                 command = commandLine.readLine();
             }
 
+            listener.StopListener();
             System.out.println("Exiting Program");
             try 
             {

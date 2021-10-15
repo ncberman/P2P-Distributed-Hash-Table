@@ -1,19 +1,20 @@
-package Server;
+package Client;
+
 import java.io.*;
 import java.net.*;
 
-public class DHTServerThread extends Thread
+public class DHTClientThread extends Thread
 {
-    private DHTServer server;
+    private DHTClientData clientData;
     private Socket socket;
 
     /* 
         Constructor to handle the creation of a new connection thread, handles our current socket connection 
         as well as our static server object we might wish to modify
     */
-    public DHTServerThread(Socket socket, DHTServer server)
+    public DHTClientThread(Socket socket, DHTClientData clientData)
     {
-        this.server = server;
+        this.clientData = clientData;
         this.socket = socket;
     }
 
@@ -22,7 +23,6 @@ public class DHTServerThread extends Thread
     */
     public void run()
     {
-        System.out.println("Connection received from " + socket.getInetAddress().getHostName());
         try
         {
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
@@ -31,10 +31,8 @@ public class DHTServerThread extends Thread
             String inputString;
             while((inputString = in.readLine()) != null)
             {
-                out.write(server.Command(inputString));
+                clientData.Command(inputString);
             }
-
-            System.out.println("Connection with " + socket.getInetAddress().getHostName() + " lost.");
 
             socket.close();
             out.close();
