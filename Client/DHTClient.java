@@ -1,13 +1,9 @@
 package Client;
 import java.io.*;
 import java.net.*;
-import java.util.Hashtable;
 
 public class DHTClient
 {
-    private Hashtable<String, String> localTable;
-    public boolean isDHT = false;
-
     private static String serverIP = "127.0.0.1";
     private static int serverPort = 38500;
     private static DHTClientData clientData;
@@ -32,6 +28,7 @@ public class DHTClient
             String command = commandLine.readLine();
             while(!command.equalsIgnoreCase("exit"))
             {
+                boolean expectResponse = true;
                 String[] tokenizedCommand = command.split(" ");
                 String msg = "";
                 /*
@@ -97,7 +94,10 @@ public class DHTClient
                 */
                 else if(tokenizedCommand[0].equalsIgnoreCase("query-dht"))
                 {
+                    String username = tokenizedCommand[1];
 
+                    msg = "QueryDHT#" + username;
+                    out.write(msg);
                 }
                 /*
                     Our fifth command will be the 'leave-dht' command, takes 1 input variable being
@@ -109,7 +109,10 @@ public class DHTClient
                 */
                 else if(tokenizedCommand[0].equalsIgnoreCase("leave-dht"))
                 {
+                    String username = tokenizedCommand[1];
 
+                    msg = "LeaveDHT#" + username;
+                    out.write(msg);
                 }
                 /*
                     Our sixth command will be the 'dht-rebuilt' command, takes 2 input variables being
@@ -123,7 +126,11 @@ public class DHTClient
                 */
                 else if(tokenizedCommand[0].equalsIgnoreCase("dht-rebuilt"))
                 {
+                    String username = tokenizedCommand[1];
+                    String leader = tokenizedCommand[2];
 
+                    msg = "RebuildDHT#" + username + "#" + leader;
+                    out.write(msg);
                 }
                 /*
                     Our seventh command will be the 'deregister' command, takes 1 input variable being
@@ -135,7 +142,10 @@ public class DHTClient
                 */
                 else if(tokenizedCommand[0].equalsIgnoreCase("deregister"))
                 {
+                    String username = tokenizedCommand[1];
 
+                    msg = "DeregeisterUser#" + username;
+                    out.write(msg);
                 }
                 /*
                     Our eighth command will be the 'teardown-dht' command, takes 1 input variable being
@@ -147,7 +157,10 @@ public class DHTClient
                 */
                 else if(tokenizedCommand[0].equalsIgnoreCase("teardown-dht"))
                 {
+                    String username = tokenizedCommand[1];
 
+                    msg = "TeardownDHT#" + username;
+                    out.write(msg);
                 }
                 /*
                     Our last command will be the 'teardown-complete' command, takes 1 input variable being
@@ -159,25 +172,28 @@ public class DHTClient
                 */
                 else if(tokenizedCommand[0].equalsIgnoreCase("teardown-complete"))
                 {
+                    String username = tokenizedCommand[1];
 
+                    msg = "TeardownCompleteDHT#" + username;
+                    out.write(msg);
                 }
                 else
                 {
+                    expectResponse = false;
                     System.out.println("Unrecognized command...");
                 }
 
-                if(!msg.equals(""))
-                {
-                    SendMessage(msg, serverIP, serverPort);
-                }
-
                 // We handle the server response here.
-                String serverResponse = in.readLine();
-                String[] tokenizedServerResponse = serverResponse.split("#");
-                for(String token : tokenizedServerResponse)
+                if(expectResponse)
                 {
-                    System.out.println(token);
+                    String serverResponse = in.readLine();
+                    String[] tokenizedServerResponse = serverResponse.split("#");
+                    for(String token : tokenizedServerResponse)
+                    {
+                        System.out.println(token);
+                    }
                 }
+                
                 command = commandLine.readLine();
             }
 
