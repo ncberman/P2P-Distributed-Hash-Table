@@ -3,7 +3,7 @@ import java.io.*;
 
 public class DHTServerClient
 {
-    public static void main(String[] args)
+    public static void main()
     {
         DHTServer server = new DHTServer();
         DHTServerListener listener = new DHTServerListener(server, 38500);

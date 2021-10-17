@@ -9,13 +9,21 @@ public class DHTClient
     private static DHTClientData clientData;
     private static DHTClientListener listener;
 
-    public static void main(int argc, String[] args) throws UnknownHostException, IOException
+    public static void main() throws UnknownHostException, IOException
     {
-        System.out.println("This machine's IP address is: " + InetAddress.getLocalHost());
-        if(argc < 2|| Integer.parseInt(args[1]) > 38999 || Integer.parseInt(args[1]) < 38501){ System.out.println("Port must be between 38500 and 39000"); return; }
-        clientData  = new DHTClientData(serverIP, serverPort);
-        listener = new DHTClientListener(clientData, Integer.parseInt(args[1]));
+        System.out.println("This machine's IP address is: " + InetAddress.getLocalHost().getHostAddress());
+        BufferedReader portIn = new BufferedReader(new InputStreamReader(System.in));
+        String inputString = portIn.readLine();
+        while(Integer.parseInt(inputString) > 38999 || Integer.parseInt(inputString) < 38501)
+        {
+            System.out.println("Port must be between 38500 and 39000");
+            inputString = portIn.readLine();
+        }
+        int myPort = Integer.parseInt(inputString);
+        clientData  = new DHTClientData(InetAddress.getLocalHost().getHostAddress(), myPort, serverIP, serverPort);
+        listener = new DHTClientListener(clientData, Integer.parseInt(inputString));
         listener.start();
+        portIn.close();
         
         // Connect our client to our server
         Socket serverSocket = new Socket(InetAddress.getByName(serverIP), serverPort);

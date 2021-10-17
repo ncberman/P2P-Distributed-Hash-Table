@@ -2,22 +2,28 @@ package Client;
 
 import java.net.*;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Scanner;
+
 import java.io.*;
 
 public class DHTClientData 
 {
-    private String username = "";
-    private String serverIP = "";
+    private String myIP;
+    private int myPort;
+    private String username;
+    private String serverIP;
     private int serverPort = 0;
     private int myID = -1;
-    private int ringSize = -1;
+    private int ringSize = 0;
     private String neighborIP;
     private int neighborPort;
-    private Hashtable<Integer, String[]> localTable;
+    private Hashtable<Integer, List<String[]>> localTable;
 
-    public DHTClientData(String serverIP, int serverPort)
+    public DHTClientData(String myIP, int myPort, String serverIP, int serverPort)
     {
+        this.myIP = myIP;
+        this.myPort = myPort;
         this.serverIP = serverIP;
         this.serverPort = serverPort;
     }
@@ -50,6 +56,55 @@ public class DHTClientData
                 username = tokenizedCommand[1];
                 break;
 
+            case "QueryUser":
+                BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+                System.out.println("Enter what country you'd like to query: ");
+                String query;
+                try 
+                {
+                    query = reader.readLine();
+                    String msg = "QueryDHT#" + query + "#" + myIP + "#" + myPort;
+                    SendMessage(msg, tokenizedCommand[2], Integer.parseInt(tokenizedCommand[3]));
+                } 
+                catch (IOException e) 
+                {
+                    e.printStackTrace();
+                }
+                break;
+
+            case "QueryDHT":
+                QueryDHT(tokenizedCommandSet, tokenizedCommand);
+                break;
+
+            case "QueryResponse":
+                if(tokenizedCommand[1].equals("ERROR")){ System.out.println("The queried name does not exist."); }
+                System.out.println("Country Code: " + tokenizedCommand[1]);
+                System.out.println("Short Name: " + tokenizedCommand[2]);
+                System.out.println("Table Name: " + tokenizedCommand[3]);
+                System.out.println("Long Name: " + tokenizedCommand[4]);
+                System.out.println("2-Alpha Code: " + tokenizedCommand[5]);
+                System.out.println("Currency Unit: " + tokenizedCommand[6]);
+                System.out.println("Region: " + tokenizedCommand[7]);
+                System.out.println("WB-2 Code: " + tokenizedCommand[8]);
+                System.out.println("Latest Population Census: " + tokenizedCommand[9]);
+                break;
+
+            case "TeardownDHT":
+                TeardownDHT();
+                break;
+
+            case "LeaveDHT":
+                LeaveDHT();
+                break;
+
+            case "NewLeader":
+                RebuildDHT();
+                break;
+
+            case "NewNeighbor":
+                NewNeighbor(tokenizedCommandSet, tokenizedCommand);
+                break;
+
             default:
                 
         }
@@ -66,7 +121,7 @@ public class DHTClientData
         neighborIP = tokenizedCommand[2];
         neighborPort = Integer.parseInt(tokenizedCommand[3]);
 
-        localTable = new Hashtable<Integer, String[]>(353);
+        localTable = new Hashtable<Integer, List<String[]>>(353);
 
         // Build our message to send to the next client
         String msg = tokenizedCommandSet[1];
@@ -97,6 +152,7 @@ public class DHTClientData
             return;
         }
 
+        myID = ringSize;
         ringSize++;
         String msg = "GetRingSize#" + ringSize;
         SendMessage(msg, neighborIP, neighborPort);
@@ -161,6 +217,7 @@ public class DHTClientData
         // If this message should be stored on this client then we put it in the hash table at the appropriate position
         if((hashKey % ringSize) == myID)
         {
+            
             String[] tableEntry = { tokenizedCommand[1],    // Country Code
                                     tokenizedCommand[2],    // Short Name
                                     tokenizedCommand[3],    // Table Name
@@ -170,7 +227,7 @@ public class DHTClientData
                                     tokenizedCommand[7],    // Region
                                     tokenizedCommand[8],    // WB-2 Code
                                     tokenizedCommand[9] };  // Latest Census
-            localTable.put(hashKey, tableEntry);
+            localTable.get(hashKey).add(tableEntry);
         }
         // Otherwise we pass the store message to the next client in the ring
         else
@@ -179,6 +236,99 @@ public class DHTClientData
             SendMessage(msg, neighborIP, neighborPort);
         }
     }
+
+    /*
+        intakes command QueryDHT LongName QuerierIP QuerierPort and searches its local hash table for the entry
+    */
+    private void QueryDHT(String[] tokenizedCommandSet, String[] tokenizedCommand)
+    {
+        // Check to see if this client is actually a part of a DHT
+        if(myID == -1){ return; }
+
+        // tokenizedCommand[4] represents the 'long name' of our table entry, our hash function uses the sum of the ascii values of the long name so we
+        // calculate that here.
+        int asciiValue = 0;
+        for(int i = 0; i < tokenizedCommand[2].length(); i++)
+        {
+            asciiValue += tokenizedCommand[2].charAt(i);
+        }
+        // Our hash function is the sum of the long name mod 353
+        int hashKey = asciiValue % 353;
+        // If the hashkey matchess this client's id
+        if((hashKey % ringSize) == myID)
+        {
+            for(String[] entry : localTable.get(hashKey))
+            {
+                if(entry[3].equals(tokenizedCommand[1]))
+                {
+                    String msg = "QueryResponse";
+                    for(String str : entry)
+                    {
+                        msg += ("#" + str);
+                    }
+                    SendMessage(msg, tokenizedCommand[2], Integer.parseInt(tokenizedCommand[3])); // This response returns the entry's information
+                    return;
+                }
+            }
+            String msg = "QueryResponse#ERROR";
+            SendMessage(msg, tokenizedCommand[2], Integer.parseInt(tokenizedCommand[3])); // This is the response we give if the entry should be in this table but isn't
+            return;
+        }
+        SendMessage(tokenizedCommandSet[0], neighborIP, neighborPort); // If we don't expect the queried entry to be in this hash table then we pass it on to the next client in the DHT.
+    }
+
+    /*
+        Teardown DHT passes the teardown command around the ring telling all the DHT participants to delete their neighbor info and their hashtable
+        after the message has been passed around the whole ring the leader deletes its information and tells the server.
+    */
+    private void TeardownDHT()
+    {
+        if(myID != -1)
+        {
+            SendMessage("TeardownDHT", neighborIP, neighborPort);
+        }
+        if(myID != 0)
+        {
+            neighborIP = "";
+            neighborPort = -1;
+            localTable.clear();
+        }
+        if(myID == -1)
+        {
+            SendMessage("TeardownCompleteDHT", serverIP, serverPort);
+        }
+        myID = -1;
+    }
+
+    private void LeaveDHT()
+    {
+        String msg = "NewNeighbor#" + (myID-1) + "#" + neighborIP + "#" + neighborPort;
+        SendMessage(msg, neighborIP, neighborPort);
+    }
+
+    private void RebuildDHT()
+    {
+        myID = 0;
+        String[] str = { "GetRingSize", "0" };
+        GetRingSize(str);
+    }
+
+    private void NewNeighbor(String[] tokenizedCommandSet, String[] tokenizedCommand)
+    {
+        // If this client matches the id of the client we want to change then change neighbor info
+        if(Integer.parseInt(tokenizedCommand[1]) == myID)
+        {
+            neighborIP = tokenizedCommand[2];
+            neighborPort = Integer.parseInt(tokenizedCommand[3]);
+        }
+        // Otherwise pass on the message to the next client
+        else
+        {
+            String msg = tokenizedCommandSet[0];
+            SendMessage(msg, neighborIP, neighborPort);
+        }
+    }
+
     // Our Method to send messages from
     public static void SendMessage(String msg, String ipaddr, int port)
     {

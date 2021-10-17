@@ -51,8 +51,12 @@ public class DHTServer
                 if(inProcessDHT){ return "FAILURE"; }
                 break;
             
-            case "TeardowninProcessDHT":
+            case "TeardownCompleteDHT":
                 if(inProcessDHT){ return "FAILURE"; }
+                break;
+
+            case "ChangeState":
+                
                 break;
                 
             default:
@@ -200,6 +204,7 @@ public class DHTServer
             {
                 // Completes our setup process
                 inProcessDHT = false;
+                DHTExists = true;
                 return "SUCCESS";
             }
         }
@@ -214,6 +219,17 @@ public class DHTServer
     */
     public String QueryDHT(String queriedUser)
     {
+        for(DHTUserData usr : UserList)
+        {
+            if(usr.username.equals(queriedUser) && usr.GetState().equals("FREE") && DHTExists)
+            {
+                Random rand = new Random();
+                DHTUserData randomUsr = ringList.get(rand.nextInt(ringList.size()));
+                String msg = "QueryResponse#" + randomUsr.username + "#" + randomUsr.GetIP() + "#" + randomUsr.GetPort();
+                return msg;
+            }
+        }
+
         return "FAILURE";
     }
 
