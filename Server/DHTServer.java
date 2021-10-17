@@ -1,6 +1,6 @@
 package Server;
 import java.util.List;
-
+import java.util.Random;
 import java.net.*;
 import java.io.*;
 
@@ -9,6 +9,7 @@ public class DHTServer
     private int serverPort = 38500; // Socket Group 75 is allowed to use ports 38500 - 38999
 
     private List<DHTUserData> UserList;
+    private List<DHTUserData> ringList;
     private boolean inProcessDHT = false;
     private boolean DHTExists = false;
 
@@ -27,7 +28,7 @@ public class DHTServer
                 if(inProcessDHT){ return "FAILURE"; }
                 return SetupDHT(Integer.parseInt(tokenizedCommand[1]), tokenizedCommand[2]);
 
-            case "inProcessDHT":
+            case "CompleteDHT":
                 break;
                 
             case "QueryDHT":
@@ -90,6 +91,7 @@ public class DHTServer
         if(!doesUserExist)
         {
             UserList.add(newUser);
+            SendMessage("Username#" + newUser.username, newUser.GetIP(), newUser.GetPort());
             return "SUCCESS";
         }
         return "FAILURE";
@@ -140,8 +142,40 @@ public class DHTServer
         {
             if(registereduser.username.equals(leader))
             {
+                // Create our list of random users we want to put into the DHT
+                ringList.clear();
+                Random rnd = new Random();
+                ringList.add(registereduser);
+                registereduser.SetState("LEADER");
+                int numUsers = 1;
+                while(numUsers < size)
+                {
+                    int randomIndex = rnd.nextInt(size);
+                    DHTUserData randomUser = UserList.get(randomIndex);
+                    if(randomUser.GetState().equals("FREE"))
+                    {
+                        ringList.add(randomUser);
+                        UserList.get(randomIndex).SetState("INDHT");
+                        numUsers++;
+                    }
+                }
+
                 // Begin DHT setup here
                 inProcessDHT = true;
+                String msg = "";
+                for(int i = 0; i < size; i++)
+                {
+                    msg += "SetupDHT";                              // SetupDHT
+                    msg += "#";                                     // SetupDHT#
+                    msg += i;                                       // SetupDHT#0
+                    msg += "#";                                     // SetupDHT#0#
+                    msg += ringList.get(i+1 % size).GetIP();        // SetupDHT#0#0.0.0.0
+                    msg += "#";                                     // SetupDHT#0#0.0.0.0#
+                    msg += ringList.get(i+1 % size).GetPort();      // SetupDHT#0#0.0.0.0#0000
+                    msg += "$";                                     // SetupDHT#0#0.0.0.0#0000$...SetupDHT#N#255.255.255.255#9999$
+                }
+                msg += "GetRingSize#0";                             // SetupDHT#0#0.0.0.0#0000$...SetupDHT#N#255.255.255.255#9999$GetRingSize#0
+                SendMessage(msg, ringList.get(0).GetIP(), ringList.get(0).GetPort()); // ringList[0] should be the leader of the DHT
                 return "SUCCESS";
             }
         }
@@ -181,6 +215,33 @@ public class DHTServer
     public String QueryDHT(String queriedUser)
     {
         return "FAILURE";
+    }
+
+    public static void SendMessage(String msg, String ipaddr, int port)
+    {
+        InetAddress address;
+        try
+        {
+            address = InetAddress.getByName(ipaddr);
+
+            try
+            {
+                Socket socket = new Socket(address, port);
+                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+                out.write(msg);
+                out.close();
+                socket.close();
+            } 
+            catch (IOException e) 
+            {
+                e.printStackTrace();
+            }
+        }
+        catch (UnknownHostException e) 
+        {
+            e.printStackTrace();
+        }
+        
     }
 }
 

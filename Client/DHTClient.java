@@ -11,8 +11,9 @@ public class DHTClient
 
     public static void main(int argc, String[] args) throws UnknownHostException, IOException
     {
+        System.out.println("This machine's IP address is: " + InetAddress.getLocalHost());
         if(argc < 2|| Integer.parseInt(args[1]) > 38999 || Integer.parseInt(args[1]) < 38501){ System.out.println("Port must be between 38500 and 39000"); return; }
-        clientData  = new DHTClientData();
+        clientData  = new DHTClientData(serverIP, serverPort);
         listener = new DHTClientListener(clientData, Integer.parseInt(args[1]));
         listener.start();
         
@@ -144,7 +145,7 @@ public class DHTClient
                 {
                     String username = tokenizedCommand[1];
 
-                    msg = "DeregeisterUser#" + username;
+                    msg = "DeregisterUser#" + username;
                     out.write(msg);
                 }
                 /*
