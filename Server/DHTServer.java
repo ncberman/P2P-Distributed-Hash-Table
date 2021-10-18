@@ -1,15 +1,12 @@
-package Server;
-import java.util.List;
-import java.util.Random;
+//package Server;
+import java.util.*;
 import java.net.*;
 import java.io.*;
 
 public class DHTServer
 {
-    private int serverPort = 38500; // Socket Group 75 is allowed to use ports 38500 - 38999
-
-    private List<DHTUserData> UserList;
-    private List<DHTUserData> ringList;
+    private List<DHTUserData> UserList = new LinkedList<DHTUserData>();
+    private List<DHTUserData> ringList = new LinkedList<DHTUserData>();
     private boolean inProcessDHT = false;
     private boolean DHTExists = false;
 
@@ -29,18 +26,27 @@ public class DHTServer
                 return SetupDHT(Integer.parseInt(tokenizedCommand[1]), tokenizedCommand[2]);
 
             case "CompleteDHT":
+                if(!inProcessDHT){ return "FAILURE"; }
+                CompleteDHT(tokenizedCommand[1]);
                 break;
                 
             case "QueryDHT":
                 if(inProcessDHT){ return "FAILURE"; }
-                return QueryDHT(tokenizedCommand[1]);
+                return QueryDHT(tokenizedCommand[1], tokenizedCommand[2]);
             
             case "LeaveDHT":
                 if(inProcessDHT){ return "FAILURE"; }
+                LeaveDHT(tokenizedCommand[1]);
+                break;
+
+            case "JoinDHT":
+                if(inProcessDHT){ return "FAILURE"; }
+                JoinDHT(tokenizedCommand[1]);
                 break;
                 
             case "RebuildDHT":
-                if(inProcessDHT){ return "FAILURE"; }
+                if(!inProcessDHT){ return "FAILURE"; }
+                RebuildDHT(tokenizedCommand[1], tokenizedCommand[2], tokenizedCommand[3], tokenizedCommand[4]);
                 break;
             
             case "DeregisterUser":
@@ -49,10 +55,12 @@ public class DHTServer
                 
             case "TeardownDHT":
                 if(inProcessDHT){ return "FAILURE"; }
+                TeardownDHT(tokenizedCommand[1]);
                 break;
             
             case "TeardownCompleteDHT":
-                if(inProcessDHT){ return "FAILURE"; }
+                if(!inProcessDHT){ return "FAILURE"; }
+                TeardownCompleteDHT(tokenizedCommand[1]);
                 break;
 
             case "ChangeState":
@@ -83,12 +91,14 @@ public class DHTServer
             if(registeredUser.username.equalsIgnoreCase(newUser.username)) 
             {
                 doesUserExist = true;
+                System.out.println("Attempted to register user: " + newUser.username + " but username is already in use");
                 break;
             }
             // see if ip/port combination already exists
             if(registeredUser.GetIP().equals(newUser.GetIP()) && registeredUser.GetPort() == newUser.GetPort())
             {
                 doesUserExist = true;
+                System.out.println("Attempted to register user: " + newUser.username + " but IP/Port combination is already in use");
                 break;
             }
         }
@@ -96,6 +106,8 @@ public class DHTServer
         {
             UserList.add(newUser);
             SendMessage("Username#" + newUser.username, newUser.GetIP(), newUser.GetPort());
+            System.out.println(newUser.username + " has been successfully registered");
+            PrintTable();
             return "SUCCESS";
         }
         return "FAILURE";
@@ -114,9 +126,12 @@ public class DHTServer
             if(registeredUser.username.equals(existingUser) && registeredUser.GetState().equals("FREE"))
             {
                 UserList.remove(registeredUser);
+                System.out.println(existingUser + " has been deregistered");
+                PrintTable();
                 return "SUCCESS";
             }
         }
+        System.out.println("Attempted to deregister user: " + existingUser + " but no user was found");
         return "FAILURE";
     }
 
@@ -169,14 +184,15 @@ public class DHTServer
                 String msg = "";
                 for(int i = 0; i < size; i++)
                 {
+                    int neighborIndex = ((i+1)%size);
                     msg += "SetupDHT";                              // SetupDHT
                     msg += "#";                                     // SetupDHT#
                     msg += i;                                       // SetupDHT#0
                     msg += "#";                                     // SetupDHT#0#
-                    msg += ringList.get(i+1 % size).GetIP();        // SetupDHT#0#0.0.0.0
+                    msg += ringList.get(neighborIndex).GetIP();        // SetupDHT#0#0.0.0.0
                     msg += "#";                                     // SetupDHT#0#0.0.0.0#
-                    msg += ringList.get(i+1 % size).GetPort();      // SetupDHT#0#0.0.0.0#0000
-                    msg += "$";                                     // SetupDHT#0#0.0.0.0#0000$...SetupDHT#N#255.255.255.255#9999$
+                    msg += ringList.get(neighborIndex).GetPort();      // SetupDHT#0#0.0.0.0#0000
+                    msg += "%";                                     // SetupDHT#0#0.0.0.0#0000$...SetupDHT#N#255.255.255.255#9999$
                 }
                 msg += "GetRingSize#0";                             // SetupDHT#0#0.0.0.0#0000$...SetupDHT#N#255.255.255.255#9999$GetRingSize#0
                 SendMessage(msg, ringList.get(0).GetIP(), ringList.get(0).GetPort()); // ringList[0] should be the leader of the DHT
@@ -205,6 +221,7 @@ public class DHTServer
                 // Completes our setup process
                 inProcessDHT = false;
                 DHTExists = true;
+                PrintTable();
                 return "SUCCESS";
             }
         }
@@ -217,20 +234,205 @@ public class DHTServer
             This function is used to query a random user that is mantaining the DHT. The taken username must not be a member of the DHT and a 
             DHT must exist for this function to execute properly.
     */
-    public String QueryDHT(String queriedUser)
+    public String QueryDHT(String queriedUser, String countryCode)
     {
+        if(!DHTExists){ System.out.println("Query attempted on DHT but DHT does not exist"); return "FAILURE"; }
         for(DHTUserData usr : UserList)
         {
             if(usr.username.equals(queriedUser) && usr.GetState().equals("FREE") && DHTExists)
             {
                 Random rand = new Random();
                 DHTUserData randomUsr = ringList.get(rand.nextInt(ringList.size()));
-                String msg = "QueryResponse#" + randomUsr.username + "#" + randomUsr.GetIP() + "#" + randomUsr.GetPort();
-                return msg;
+                String msg = "QueryDHT#" + countryCode + "#" + usr.GetIP() + "#" + usr.GetPort();
+                System.out.println("Query on DHT has been initiated by " + queriedUser);
+                SendMessage(msg, randomUsr.GetIP(), randomUsr.GetPort());
+                return "SUCCESS";
             }
         }
 
         return "FAILURE";
+    }
+
+    /*
+        LeaveDHT function
+            This function initiates the removal of a DHT member leaving the DHT
+    */
+    public String LeaveDHT(String userToLeave)
+    {
+        if(!DHTExists){ System.out.println("User to attempted to leave DHT but DHT does not exist"); return "FAILURE"; }
+        if(ringList.size() < 2){ System.out.println("LeaveDHT command received but DHT is too small"); return "FAILURE"; }
+        for(DHTUserData usr : ringList)
+        {
+            if(userToLeave.equals(usr.username))
+            {
+                if(usr.GetState().equals("INDHT") || usr.GetState().equals("LEADER"))
+                {
+                    String msg = "LeaveDHT";
+                    SendMessage(msg, usr.GetIP(), usr.GetPort());
+                    inProcessDHT = true;
+                    System.out.println(usr.username + " has begun the process of leaving the DHT");
+                    PrintTable();
+                    return "SUCCESS";
+                }
+                else
+                {
+                    System.out.println(usr.username + " tried to leave DHT but is not part of the DHT");
+                    return "FAILURE";
+                }
+            }
+        }
+        System.out.println(userToLeave + " tried to leave the DHT but does not exist");
+        return "FAILURE";
+    }
+
+    public String JoinDHT(String userToJoin)
+    {
+        if(!DHTExists){ System.out.println("User to attempted to leave DHT but DHT does not exist"); return "FAILURE"; }
+        for(DHTUserData usr : UserList)
+        {
+            if(userToJoin.equals(usr.username))
+            {
+                if(usr.GetState().equals("FREE"))
+                {
+                    String msg = "JoinDHT#" + ringList.size() + "#" + ringList.get(0).GetIP() + "#" + ringList.get(0).GetPort();
+                    SendMessage(msg, usr.GetIP(), usr.GetPort());
+                    inProcessDHT = true;
+                    System.out.println(usr.username + " has begun the process of joining the DHT");
+                    PrintTable();
+                    return "SUCCESS";
+                }
+            }
+        }
+        System.out.println(userToJoin + " tried to join the DHT but does not exist");
+        return "FAILURE";
+    }
+
+    /*
+        RebuildDHT function
+            This function executes after the server has been told that the DHT has been succesfully reconfigured.
+    */
+    public String RebuildDHT(String userLeft, String leaderIP, String leaderPort, String polarity)
+    {
+        if(polarity.equals("-1"))
+        {
+            for(DHTUserData usr : ringList)
+            {
+                if(userLeft.equals(usr.username))
+                {
+                    ringList.remove(usr);
+                }
+            }
+
+            for(DHTUserData usr : UserList)
+            {
+                if(userLeft.equals(usr.username))
+                {
+                    usr.SetState("FREE");
+                    System.out.println(usr.username + " has successfully left the DHT");
+                }
+                if((leaderIP+leaderPort).equals(usr.GetIP()+usr.GetPort()))
+                {
+                    usr.SetState("LEADER");
+                    System.out.println("New DHT leader is: " + usr.username);
+                }
+                else if(usr.GetState().equals("LEADER"))
+                {
+                    usr.SetState("INDHT");
+                }
+            }
+        }
+        else
+        {
+            for(DHTUserData usr : UserList)
+            {
+                if(userLeft.equals(usr.username))
+                {
+                    usr.SetState("INDHT");
+                    System.out.println(usr.username + " has successfully joined the DHT");
+                    ringList.add(usr);
+                }
+            }
+        }
+        
+
+        inProcessDHT = false;
+        PrintTable();
+        return "SUCCESS";
+    }
+
+    /*
+        TeardownDHT function
+            this function tells the expected leader of the current DHT to teardown the current DHT
+    */
+    public String TeardownDHT(String leader)
+    {
+        if(!DHTExists){System.out.println("Teardown attempted on DHT but DHT does not exist"); return "FAILURE"; }
+        for(DHTUserData usr : UserList)
+        {
+            if(usr.username.equals(leader) && usr.GetState().equals("LEADER"))
+            {
+                String msg = "TeardownDHT";
+                SendMessage(msg, usr.GetIP(), usr.GetPort());
+                inProcessDHT = true;
+                System.out.println("Teardown process for DHT initiated successfully");
+                return "SUCCESS";
+            }
+        }
+        System.out.println(leader + " is not the current leader of the DHT");
+        return "FAILURE";
+    }
+
+    /*
+        TeardownCompleteDHT function
+            this function is only activated when the leader of the current DHT has completed a total DHT deletion with its peers
+    */
+    public String TeardownCompleteDHT(String leader)
+    {
+        boolean leaderIsLeader = false;
+        for(DHTUserData usr : UserList)
+        {
+            if(usr.username.equals(leader) && usr.GetState().equals("LEADER"))
+            {
+                leaderIsLeader = true;
+                break;
+            }
+        }
+
+        if(leaderIsLeader)
+        {
+            ringList.clear();
+            for(DHTUserData usr : UserList)
+            {
+                if(usr.GetState().equals("LEADER") || usr.GetState().equals("INDHT"))
+                {
+                    usr.SetState("FREE");
+                }
+            }
+            DHTExists = false;
+            inProcessDHT = false;
+            System.out.println("Teardown process for DHT completed successfully");
+            PrintTable();
+            return "SUCCESS";
+        }
+        System.out.println(leader + " cannot verify teardown");
+        return "FAILURE";
+    }
+
+    public void PrintTable()
+    {
+        System.out.println("Username\tState\t\t\tIPv4\t\tPort");
+        for(DHTUserData usr : UserList)
+        {
+            System.out.println(usr.username + "\t\t" + usr.GetState() + "\t\t" + usr.GetIP() + "\t\t" + usr.GetPort());
+        }
+    }
+
+    public void ResetServer()
+    {
+        ringList.clear();
+        UserList.clear();
+        inProcessDHT = false;
+        DHTExists = false;
     }
 
     public static void SendMessage(String msg, String ipaddr, int port)
@@ -244,7 +446,8 @@ public class DHTServer
             {
                 Socket socket = new Socket(address, port);
                 PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-                out.write(msg);
+                System.out.println("Message Sent: " + msg);
+                out.println(msg);
                 out.close();
                 socket.close();
             } 

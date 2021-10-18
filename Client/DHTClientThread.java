@@ -1,4 +1,4 @@
-package Client;
+//package Client;
 
 import java.io.*;
 import java.net.*;
@@ -28,11 +28,10 @@ public class DHTClientThread extends Thread
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             BufferedReader in  = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-            String inputString;
-            while((inputString = in.readLine()) != null)
-            {
-                clientData.Command(inputString);
-            }
+            String inputString = in.readLine();
+            System.out.println("Message Received: " + inputString);
+            clientData.Command(inputString);
+            
 
             socket.close();
             out.close();

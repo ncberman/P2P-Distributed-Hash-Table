@@ -1,39 +1,50 @@
-package Client;
+//package Client;
 import java.io.*;
 import java.net.*;
 
 public class DHTClient
 {
-    private static String serverIP = "127.0.0.1";
+    private static String serverIP = "192.168.1.133";
     private static int serverPort = 38500;
-    private static DHTClientData clientData;
-    private static DHTClientListener listener;
+    private static String myIP;
+    private static int myPort;
+    private static boolean isRegistered = false;
 
-    public static void main() throws UnknownHostException, IOException
+    public static void main(String[] args) throws UnknownHostException, IOException
     {
-        System.out.println("This machine's IP address is: " + InetAddress.getLocalHost().getHostAddress());
+        myIP = InetAddress.getLocalHost().getHostAddress();
+        System.out.println("This machine's IP address is: " + myIP);
         BufferedReader portIn = new BufferedReader(new InputStreamReader(System.in));
+        System.out.println("Enter what port you'd like to listen on between 38500 and 39000 . . .");
         String inputString = portIn.readLine();
         while(Integer.parseInt(inputString) > 38999 || Integer.parseInt(inputString) < 38501)
         {
             System.out.println("Port must be between 38500 and 39000");
             inputString = portIn.readLine();
         }
-        int myPort = Integer.parseInt(inputString);
-        clientData  = new DHTClientData(InetAddress.getLocalHost().getHostAddress(), myPort, serverIP, serverPort);
-        listener = new DHTClientListener(clientData, Integer.parseInt(inputString));
+
+        myPort = Integer.parseInt(inputString);
+        DHTClientData clientData  = new DHTClientData(InetAddress.getLocalHost().getHostAddress(), myPort, serverIP, serverPort);
+        DHTClientListener listener = new DHTClientListener(clientData, Integer.parseInt(inputString));
         listener.start();
-        portIn.close();
-        
-        // Connect our client to our server
-        Socket serverSocket = new Socket(InetAddress.getByName(serverIP), serverPort);
-        PrintWriter out = new PrintWriter(serverSocket.getOutputStream(), true);
-        BufferedReader in = new BufferedReader( new InputStreamReader(serverSocket.getInputStream()));
-        
+        //portIn.close();
 
         try
         {
+            Socket serverSocket = new Socket(InetAddress.getByName(serverIP), serverPort);
+            PrintWriter out = new PrintWriter(serverSocket.getOutputStream(), true);
+            BufferedReader in = new BufferedReader( new InputStreamReader(serverSocket.getInputStream()));
             BufferedReader commandLine = new BufferedReader(new InputStreamReader(System.in));
+
+            System.out.println("\nCommands:");
+            System.out.println("register <Username>");
+            System.out.println("setup-dht <Size of DHT> <Name of DHT leader>");
+            System.out.println("query-dht <Alpha-3 Code>");
+            System.out.println("leave-dht <Username of who should be removed>");
+            System.out.println("join-dht <Username of who want to join>");
+            System.out.println("teardown-dht <Username of Current DHT leader>");
+            System.out.println("deregister\n");
+
             String command = commandLine.readLine();
             while(!command.equalsIgnoreCase("exit"))
             {
@@ -52,12 +63,16 @@ public class DHTClient
                 */
                 if(tokenizedCommand[0].equalsIgnoreCase("register"))
                 {
-                    String username = tokenizedCommand[1];
-                    String ipv4 = tokenizedCommand[2];
-                    String port = tokenizedCommand[3];
+                    if(isRegistered){ System.out.println("You are already registered"); expectResponse = false; }
+                    else
+                    {
+                        clientData.username = tokenizedCommand[1];
 
-                    msg = "RegisterUser#" + username + "#" + ipv4 + "#" + port;
-                    out.write(msg);
+                        msg = "RegisterUser#" + clientData.username + "#" + myIP + "#" + myPort;
+                        System.out.println("Message Sent: " + msg);
+                        out.println(msg);
+                        isRegistered = true;
+                    }
                 }
                 /*
                     Our second command will be the 'setup-dht' command, takes 2 inputs variables being
@@ -74,7 +89,8 @@ public class DHTClient
                     String username = tokenizedCommand[2];
 
                     msg = "SetupDHT#" + size + "#" + username;
-                    out.write(msg);
+                    System.out.println("Message Sent: " + msg);
+                    out.println(msg);
                 }
                 /*
                     Our third command will be the 'dht-complete' command, takes 1 input variable being
@@ -91,7 +107,8 @@ public class DHTClient
                     String username = tokenizedCommand[1];
 
                     msg = "CompleteDHT#" + username;
-                    out.write(msg);
+                    System.out.println("Message Sent: " + msg);
+                    out.println(msg);
                 }
                 /*
                     Our fourth command will be the 'query-dht' command, takes 1 input variable being
@@ -103,10 +120,11 @@ public class DHTClient
                 */
                 else if(tokenizedCommand[0].equalsIgnoreCase("query-dht"))
                 {
-                    String username = tokenizedCommand[1];
+                    String longName = tokenizedCommand[1];
 
-                    msg = "QueryDHT#" + username;
-                    out.write(msg);
+                    msg = "QueryDHT#" + clientData.username + "#" + longName;
+                    System.out.println("Message Sent: " + msg);
+                    out.println(msg);
                 }
                 /*
                     Our fifth command will be the 'leave-dht' command, takes 1 input variable being
@@ -121,7 +139,24 @@ public class DHTClient
                     String username = tokenizedCommand[1];
 
                     msg = "LeaveDHT#" + username;
-                    out.write(msg);
+                    System.out.println("Message Sent: " + msg);
+                    out.println(msg);
+                }
+                /*
+                    Our 5.5th command will be the 'leave-dht' command, takes 1 input variable being
+                        1. Username to be added
+                    This command will construct a #-Separated with the header using the default leave-dht header 'LeaveDHT'
+
+                    The purpose of this command is to begin the process of removing a specified user from the DHT. After the DHT has been
+                    modified by the successful execution of this command the server will only accept the command 'dht-rebuilt'.
+                */
+                else if(tokenizedCommand[0].equalsIgnoreCase("join-dht"))
+                {
+                    String username = tokenizedCommand[1];
+
+                    msg = "JoinDHT#" + username;
+                    System.out.println("Message Sent: " + msg);
+                    out.println(msg);
                 }
                 /*
                     Our sixth command will be the 'dht-rebuilt' command, takes 2 input variables being
@@ -139,7 +174,8 @@ public class DHTClient
                     String leader = tokenizedCommand[2];
 
                     msg = "RebuildDHT#" + username + "#" + leader;
-                    out.write(msg);
+                    System.out.println("Message Sent: " + msg);
+                    out.println(msg);
                 }
                 /*
                     Our seventh command will be the 'deregister' command, takes 1 input variable being
@@ -151,10 +187,11 @@ public class DHTClient
                 */
                 else if(tokenizedCommand[0].equalsIgnoreCase("deregister"))
                 {
-                    String username = tokenizedCommand[1];
+                    //String username = tokenizedCommand[1];
 
-                    msg = "DeregisterUser#" + username;
-                    out.write(msg);
+                    msg = "DeregisterUser#" + clientData.username;
+                    System.out.println("Message Sent: " + msg);
+                    out.println(msg);
                 }
                 /*
                     Our eighth command will be the 'teardown-dht' command, takes 1 input variable being
@@ -169,7 +206,8 @@ public class DHTClient
                     String username = tokenizedCommand[1];
 
                     msg = "TeardownDHT#" + username;
-                    out.write(msg);
+                    System.out.println("Message Sent: " + msg);
+                    out.println(msg);
                 }
                 /*
                     Our last command will be the 'teardown-complete' command, takes 1 input variable being
@@ -184,7 +222,8 @@ public class DHTClient
                     String username = tokenizedCommand[1];
 
                     msg = "TeardownCompleteDHT#" + username;
-                    out.write(msg);
+                    System.out.println("Message Sent: " + msg);
+                    out.println(msg);
                 }
                 else
                 {
@@ -205,15 +244,12 @@ public class DHTClient
                 
                 command = commandLine.readLine();
             }
-
+            //serverSocket.close();
             System.out.println("Exiting Program");
-            try 
-            {
-                Thread.sleep(1000);
-            } 
-            catch (InterruptedException e) { e.printStackTrace(); }
+            listener.listening = false;
+            SendMessage("Exit", "127.0.0.1", myPort);
         }
-        catch(IOException e){ System.out.println(e); }
+        catch(IOException e){ System.out.println(e); return; }
     }
 
     // Our Method to send messages from
@@ -228,7 +264,8 @@ public class DHTClient
             {
                 Socket socket = new Socket(address, port);
                 PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-                out.write(msg);
+                //System.out.println("Message Sent: " + msg);
+                out.println(msg);
                 out.close();
                 socket.close();
             } 

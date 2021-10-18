@@ -1,9 +1,11 @@
-package Server;
+//package Server;
 import java.io.*;
+import java.net.*;
+
 
 public class DHTServerClient
 {
-    public static void main()
+    public static void main(String[] args)
     {
         DHTServer server = new DHTServer();
         DHTServerListener listener = new DHTServerListener(server, 38500);
@@ -15,6 +17,17 @@ public class DHTServerClient
             String command = commandLine.readLine();
             while(!command.equalsIgnoreCase("exit"))
             {
+                if(command.equalsIgnoreCase("restart"))
+                {
+                    server.ResetServer();
+                    listener.listening = false;
+                    SendMessage("Exit", "127.0.0.1", 38500);
+                    listener.start();                    
+                }
+                if(command.equalsIgnoreCase("table"))
+                {
+                    server.PrintTable();
+                }
                 if(command.equalsIgnoreCase("start"))
                 {
                     if(!listener.isAlive())
@@ -28,7 +41,8 @@ public class DHTServerClient
                 {
                     if(listener.isAlive())
                     {
-                        listener.StopListener();
+                        listener.listening = false;
+                        SendMessage("Exit", "127.0.0.1", 38500);
                         System.out.println("Server successfully stopped!");
                     }
                     else{ System.out.println("Server is not currently running."); }
@@ -41,14 +55,37 @@ public class DHTServerClient
                 command = commandLine.readLine();
             }
 
-            listener.StopListener();
             System.out.println("Exiting Program");
-            try 
-            {
-                Thread.sleep(1000);
-            } 
-            catch (InterruptedException e) { e.printStackTrace(); }
+            listener.listening = false;
+            SendMessage("Exit", "127.0.0.1", 38500);
         }
         catch(IOException e){ System.out.println(e); }
+    }
+    public static void SendMessage(String msg, String ipaddr, int port)
+    {
+        InetAddress address;
+        try
+        {
+            address = InetAddress.getByName(ipaddr);
+
+            try
+            {
+                Socket socket = new Socket(address, port);
+                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+                //System.out.println("Message Sent: " + msg);
+                out.println(msg);
+                out.close();
+                socket.close();
+            } 
+            catch (IOException e) 
+            {
+                e.printStackTrace();
+            }
+        }
+        catch (UnknownHostException e) 
+        {
+            e.printStackTrace();
+        }
+        
     }
 }

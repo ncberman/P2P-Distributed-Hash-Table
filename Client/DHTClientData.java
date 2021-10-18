@@ -1,17 +1,15 @@
-package Client;
+//package Client;
 
 import java.net.*;
-import java.util.Hashtable;
-import java.util.List;
-import java.util.Scanner;
-
+import java.security.KeyStore.Entry;
+import java.util.*;
 import java.io.*;
 
 public class DHTClientData 
 {
     private String myIP;
     private int myPort;
-    private String username;
+    public String username;
     private String serverIP;
     private int serverPort = 0;
     private int myID = -1;
@@ -19,6 +17,7 @@ public class DHTClientData
     private String neighborIP;
     private int neighborPort;
     private Hashtable<Integer, List<String[]>> localTable;
+    private boolean rebuildingDHT = false;
 
     public DHTClientData(String myIP, int myPort, String serverIP, int serverPort)
     {
@@ -26,21 +25,31 @@ public class DHTClientData
         this.myPort = myPort;
         this.serverIP = serverIP;
         this.serverPort = serverPort;
+
+        localTable = new Hashtable<Integer, List<String[]>>(353);
+        for(int i = 0; i < 353; i++)
+        {
+            localTable.put(i, new LinkedList<String[]>());
+        }
     }
 
     public void Command(String input)
     {
+        //System.out.println("Ding!");
         /*
             Client Data inputs many times contains information meant for separate clients. To differentiate which data is meant for which clients 
-            my string tokenizer symbols have become '$' to separate commands for different clients and '#' to separate individual pieces of information
+            my string tokenizer symbols have become '%' to separate commands for different clients and '#' to separate individual pieces of information
             within a single clients command.        
         */
-        String[] tokenizedCommandSet = input.split("$");
+        String[] tokenizedCommandSet = input.split("%");
         String[] tokenizedCommand = tokenizedCommandSet[0].split("#");
+
+        //System.out.println(tokenizedCommandSet[0]);
 
         switch(tokenizedCommand[0])
         {
             case "SetupDHT":
+                //System.out.println("SetupDHT command received");
                 SetupDHT(tokenizedCommandSet, tokenizedCommand);
                 break;
             
@@ -53,6 +62,7 @@ public class DHTClientData
                 break;
 
             case "Username":
+                //System.out.println("Username set to " + tokenizedCommand[1]);
                 username = tokenizedCommand[1];
                 break;
 
@@ -77,7 +87,7 @@ public class DHTClientData
                 break;
 
             case "QueryResponse":
-                if(tokenizedCommand[1].equals("ERROR")){ System.out.println("The queried name does not exist."); }
+                if(tokenizedCommand[1].equals("ERROR")){ System.out.println("The queried name does not exist."); break; }
                 System.out.println("Country Code: " + tokenizedCommand[1]);
                 System.out.println("Short Name: " + tokenizedCommand[2]);
                 System.out.println("Table Name: " + tokenizedCommand[3]);
@@ -89,6 +99,9 @@ public class DHTClientData
                 System.out.println("Latest Population Census: " + tokenizedCommand[9]);
                 break;
 
+            case "QueryRedirect":
+                break;
+
             case "TeardownDHT":
                 TeardownDHT();
                 break;
@@ -97,12 +110,25 @@ public class DHTClientData
                 LeaveDHT();
                 break;
 
+            case "JoinDHT":
+                JoinDHT(tokenizedCommand);
+                break;
+
             case "NewLeader":
                 RebuildDHT();
                 break;
 
             case "NewNeighbor":
                 NewNeighbor(tokenizedCommandSet, tokenizedCommand);
+                break;
+
+            case "RingSize":
+                if(myID != 0)
+                {
+                    ringSize = Integer.parseInt(tokenizedCommand[1]);
+                    String msg = "RingSize#" + tokenizedCommand[1];
+                    SendMessage(msg, neighborIP, neighborPort);
+                }
                 break;
 
             default:
@@ -121,15 +147,24 @@ public class DHTClientData
         neighborIP = tokenizedCommand[2];
         neighborPort = Integer.parseInt(tokenizedCommand[3]);
 
-        localTable = new Hashtable<Integer, List<String[]>>(353);
+        if(myID == 0)
+        {
+            System.out.println("You have been selected to be the leader of the DHT");
+        }
+        else
+        {
+            System.out.println("You have been selected as a part of the DHT");
+        }
+
+        
 
         // Build our message to send to the next client
         String msg = tokenizedCommandSet[1];
         if(tokenizedCommandSet.length > 1)
         {
-            for(int i = 1; i < tokenizedCommandSet.length; i++)
+            for(int i = 2; i < tokenizedCommandSet.length; i++)
             {
-                msg += ("$" + tokenizedCommandSet[i]);
+                msg += ("%" + tokenizedCommandSet[i]);
             }
         }
         
@@ -147,14 +182,17 @@ public class DHTClientData
         // If we have made a pass and this client is the leader of the DHT we return
         if(count != 0 && myID == 0)
         {
+            //System.out.println("Finished getting ring of size " + count);
             ringSize = count;
+            String msg = "RingSize#" + ringSize;
+            SendMessage(msg, neighborIP, neighborPort);
             DistributeData();
             return;
         }
 
-        myID = ringSize;
-        ringSize++;
-        String msg = "GetRingSize#" + ringSize;
+        myID = count;
+        count++;
+        String msg = "GetRingSize#" + count;
         SendMessage(msg, neighborIP, neighborPort);
     }
 
@@ -167,6 +205,7 @@ public class DHTClientData
         File csvFile = new File("StatsCountry.csv");
         try 
         {
+            System.out.println("Distributing CSV data . . .");
             Scanner fileReader = new Scanner(csvFile);
             String line = fileReader.nextLine(); // Skip the first line of the file
             while(fileReader.hasNextLine())
@@ -183,11 +222,19 @@ public class DHTClientData
                 Command(command);
             }
             fileReader.close();
+            System.out.println("CSV data distribution complete");
             /*
                 At this point our DHT should be completely set up and we will send a message back to the server letting it know that the DHT is complete.
             */
-            String msg = "CompleteDHT#" + username;
-            SendMessage(msg, serverIP, serverPort);
+            if(!rebuildingDHT)
+            {
+                String msg = "CompleteDHT#" + username;
+                SendMessage(msg, serverIP, serverPort);
+            }
+            else
+            {
+                rebuildingDHT = false;
+            }
         } 
         catch (FileNotFoundException e) 
         {
@@ -207,9 +254,9 @@ public class DHTClientData
         // tokenizedCommand[4] represents the 'long name' of our table entry, our hash function uses the sum of the ascii values of the long name so we
         // calculate that here.
         int asciiValue = 0;
-        for(int i = 0; i < tokenizedCommand[4].length(); i++)
+        for(int i = 0; i < tokenizedCommand[1].length(); i++)
         {
-            asciiValue += tokenizedCommand[4].charAt(i);
+            asciiValue += tokenizedCommand[1].charAt(i);
         }
         // Our hash function is the sum of the long name mod 353
         int hashKey = asciiValue % 353;
@@ -217,8 +264,18 @@ public class DHTClientData
         // If this message should be stored on this client then we put it in the hash table at the appropriate position
         if((hashKey % ringSize) == myID)
         {
-            
-            String[] tableEntry = { tokenizedCommand[1],    // Country Code
+            System.out.println("Storing data for " + tokenizedCommand[4]);
+            String[] tableEntry = new String[20];
+            int c = 0;
+            for(String str : tokenizedCommand)
+            {
+                if(c!=0)
+                {
+                    tableEntry[c-1] = str;
+                }
+                c++;
+            }
+            /*String[] tableEntry = { tokenizedCommand[1],    // Country Code
                                     tokenizedCommand[2],    // Short Name
                                     tokenizedCommand[3],    // Table Name
                                     tokenizedCommand[4],    // Long Name
@@ -226,7 +283,7 @@ public class DHTClientData
                                     tokenizedCommand[6],    // Currency
                                     tokenizedCommand[7],    // Region
                                     tokenizedCommand[8],    // WB-2 Code
-                                    tokenizedCommand[9] };  // Latest Census
+                                    tokenizedCommand[9] };  // Latest Census*/
             localTable.get(hashKey).add(tableEntry);
         }
         // Otherwise we pass the store message to the next client in the ring
@@ -238,19 +295,20 @@ public class DHTClientData
     }
 
     /*
-        intakes command QueryDHT LongName QuerierIP QuerierPort and searches its local hash table for the entry
+        intakes command QueryDHT CountryCode QuerierIP QuerierPort and searches its local hash table for the entry
     */
     private void QueryDHT(String[] tokenizedCommandSet, String[] tokenizedCommand)
     {
+        System.out.println("Query request received for " + tokenizedCommand[1]);
         // Check to see if this client is actually a part of a DHT
         if(myID == -1){ return; }
 
         // tokenizedCommand[4] represents the 'long name' of our table entry, our hash function uses the sum of the ascii values of the long name so we
         // calculate that here.
         int asciiValue = 0;
-        for(int i = 0; i < tokenizedCommand[2].length(); i++)
+        for(int i = 0; i < tokenizedCommand[1].length(); i++)
         {
-            asciiValue += tokenizedCommand[2].charAt(i);
+            asciiValue += tokenizedCommand[1].charAt(i);
         }
         // Our hash function is the sum of the long name mod 353
         int hashKey = asciiValue % 353;
@@ -259,8 +317,9 @@ public class DHTClientData
         {
             for(String[] entry : localTable.get(hashKey))
             {
-                if(entry[3].equals(tokenizedCommand[1]))
+                if(entry[0].equals(tokenizedCommand[1]))
                 {
+                    System.out.println("Queried data found!");
                     String msg = "QueryResponse";
                     for(String str : entry)
                     {
@@ -274,6 +333,7 @@ public class DHTClientData
             SendMessage(msg, tokenizedCommand[2], Integer.parseInt(tokenizedCommand[3])); // This is the response we give if the entry should be in this table but isn't
             return;
         }
+
         SendMessage(tokenizedCommandSet[0], neighborIP, neighborPort); // If we don't expect the queried entry to be in this hash table then we pass it on to the next client in the DHT.
     }
 
@@ -291,11 +351,14 @@ public class DHTClientData
         {
             neighborIP = "";
             neighborPort = -1;
-            localTable.clear();
+            for(int i = 0; i < 353; i++)
+            {
+                localTable.get(i).clear();
+            }
         }
         if(myID == -1)
         {
-            SendMessage("TeardownCompleteDHT", serverIP, serverPort);
+            SendMessage("TeardownCompleteDHT#" + username, serverIP, serverPort);
         }
         myID = -1;
     }
@@ -304,10 +367,30 @@ public class DHTClientData
     {
         String msg = "NewNeighbor#" + (myID-1) + "#" + neighborIP + "#" + neighborPort;
         SendMessage(msg, neighborIP, neighborPort);
+        msg = "NewLeader";
+        SendMessage(msg, neighborIP, neighborPort);
+        msg = "RebuildDHT#" + username + "#" + neighborIP + "#" + neighborPort + "#-1";
+        SendMessage(msg, serverIP, serverPort);
+    }
+
+    // JoinDHT#myID#neighborIP#neighborPort
+    private void JoinDHT(String[] tokenizedCommand)
+    {
+        myID = Integer.parseInt(tokenizedCommand[1]);
+        neighborIP = tokenizedCommand[2];
+        neighborPort = Integer.parseInt(tokenizedCommand[3]);
+
+        String msg = "NewNeighbor#" + (myID-1) + "#" + myIP + "#" + myPort;
+        SendMessage(msg, neighborIP, neighborPort);
+        msg = "NewLeader";
+        SendMessage(msg, neighborIP, neighborPort);
+        msg = "RebuildDHT#" + username + "#" + neighborIP + "#" + neighborPort + "#+1";
+        SendMessage(msg, serverIP, serverPort);
     }
 
     private void RebuildDHT()
     {
+        rebuildingDHT = true;
         myID = 0;
         String[] str = { "GetRingSize", "0" };
         GetRingSize(str);
@@ -327,6 +410,10 @@ public class DHTClientData
             String msg = tokenizedCommandSet[0];
             SendMessage(msg, neighborIP, neighborPort);
         }
+        for(int i = 0; i < 353; i++)
+        {
+            localTable.get(i).clear();
+        }
     }
 
     // Our Method to send messages from
@@ -341,7 +428,8 @@ public class DHTClientData
             {
                 Socket socket = new Socket(address, port);
                 PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-                out.write(msg);
+                System.out.println("Message Sent: " + msg);
+                out.println(msg);
                 out.close();
                 socket.close();
             } 

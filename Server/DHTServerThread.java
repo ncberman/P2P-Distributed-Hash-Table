@@ -1,4 +1,4 @@
-package Server;
+//package Server;
 import java.io.*;
 import java.net.*;
 
@@ -22,19 +22,20 @@ public class DHTServerThread extends Thread
     */
     public void run()
     {
-        System.out.println("Connection received from " + socket.getInetAddress().getHostName());
+        System.out.println("Connection received from " + socket.getInetAddress().getHostAddress());
         try
         {
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             BufferedReader in  = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-            String inputString;
+            String inputString = "";
             while((inputString = in.readLine()) != null)
             {
-                out.write(server.Command(inputString));
+                System.out.println("Message Received: " + inputString);
+                out.println(server.Command(inputString));
             }
 
-            System.out.println("Connection with " + socket.getInetAddress().getHostName() + " lost.");
+            System.out.println("Connection with " + socket.getInetAddress().getHostAddress() + " lost.");
 
             socket.close();
             out.close();
@@ -42,7 +43,7 @@ public class DHTServerThread extends Thread
         } 
         catch (IOException e)
         {
-            e.printStackTrace();
+            //e.printStackTrace();
         }
         
     }

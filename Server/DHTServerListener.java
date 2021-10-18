@@ -1,4 +1,4 @@
-package Server;
+//package Server;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -26,16 +26,11 @@ public class DHTServerListener extends Thread
                 System.out.println("Waiting for connections . . .");
                 new DHTServerThread(mySocket.accept(), server).start();
             }
-            //mySocket.close();
+            mySocket.close();
         }
         catch(IOException e)
         {
             e.printStackTrace();
         }
-    }
-
-    public void StopListener()
-    {
-        listening = false;
     }
 }
